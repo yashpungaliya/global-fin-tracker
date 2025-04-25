@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Tariff & Stock Impact Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+          theme: {
+            extend: {
+              fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+              },
+              colors: {
+                'brand-blue': '#2563eb',
+                'brand-blue-dark': '#1d4ed8',
+                'light-gray': '#f8f9fa',
+              }
+            }
+          }
+        }
+    </script>
+    <style>
+        body { background-color: #f8f9fa; /* Lighter gray background */ }
+        #loading-tariffs, #loading-stocks { text-align: center; padding: 3rem 1rem; font-style: italic; color: #6b7280; }
+
+        /* Control Styling */
+        .control-input, .control-select { padding: 0.625rem 0.875rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem; margin-right: 0.5rem; margin-bottom: 0.5rem; transition: border-color 0.2s, box-shadow 0.2s; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); background-color: white; }
+        .control-input:focus, .control-select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2); }
+        .control-select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+
+        /* Card Styling (Shared by Tariff & Stock Cards) */
+        .data-card { background-color: white; border-radius: 0.5rem; border: 1px solid #e5e7eb; padding: 1.25rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07); transition: box-shadow 0.2s ease-in-out; display: flex; flex-direction: column; height: 100%; }
+        .data-card:hover { box-shadow: 0 4px 8px 0 rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08); }
+        .data-card h3 { font-size: 1rem; font-weight: 600; color: #1f2937; margin-bottom: 0.5rem; }
+        .data-card p { font-size: 0.875rem; color: #4b5563; margin-bottom: 0.75rem; line-height: 1.5; }
+        .data-card .meta-info { font-size: 0.8rem; color: #6b7280; margin-bottom: 1rem; }
+        .data-card .tariff-change-display { font-weight: 500; margin-bottom: 1rem; }
+
+        /* Trend Info Toggle */
+        .info-icon { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-left: 8px; color: #6b7280; vertical-align: middle; width: 1.25rem; height: 1.25rem; border-radius: 9999px; transition: background-color 0.2s, color 0.2s; }
+        .info-icon:hover { background-color: #e5e7eb; color: #1f2937; }
+        .trend-details { display: none; margin-top: 0.75rem; padding: 0.75rem; background-color: #f3f4f6; border-radius: 0.375rem; font-size: 0.875rem; color: #4b5563; border-left: 4px solid #60a5fa; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07); }
+        .trend-details strong { color: #1f2937; }
+
+        /* Tab Navigation Styling */
+        .tab-nav button { padding: 0.5rem 1rem; margin-right: 0.5rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; transition: background-color 0.2s, color 0.2s; border: 1px solid transparent; }
+        .tab-nav button.active { background-color: white; color: #1d4ed8; /* brand-blue-dark */ border-color: #d1d5db; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+        .tab-nav button:not(.active) { color: #dbeafe; /* blue-100 */ }
+        .tab-nav button:not(.active):hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+
+        /* Stock Card Specifics */
+        .stock-ticker { font-family: monospace; font-size: 0.9rem; background-color: #eef2ff; /* indigo-50 */ color: #3730a3; /* indigo-800 */ padding: 0.1rem 0.4rem; border-radius: 0.25rem; }
+        .stock-country { font-size: 0.75rem; color: #6b7280; }
+
+    </style>
+</head>
+<body class="bg-light-gray text-gray-800 font-sans antialiased">
+
+    <header class="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-5 shadow-md mb-8">
+        <div class="container mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                 <div>
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Global Tariff & Stock Impact Tracker</h1>
+                    <p class="text-blue-100 mt-1 text-sm sm:text-base opacity-90">Recent Changes & Potential Market Impact</p>
+                </div>
+            </div>
+            <nav class="tab-nav border-t border-blue-500 pt-3">
+                <button id="tab-tariffs" class="active">Tariff Updates</button>
+                <button id="tab-stocks">Stock Impact Analysis</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8">
+
+        <div id="tariff-view">
+            <section id="tariff-data">
+                <div id="tariff-controls" class="mb-8 p-4 bg-white rounded-lg border border-gray-200 shadow-sm flex flex-wrap items-center gap-x-4 gap-y-3">
+                    <label class="text-sm font-medium text-gray-600 shrink-0">Filter by:</label>
+                    <input type="text" id="filter-reporting" placeholder="Reporting Country" class="control-input w-full sm:w-auto" aria-label="Filter by Reporting Country">
+                    <input type="text" id="filter-partner" placeholder="Partner Country" class="control-input w-full sm:w-auto" aria-label="Filter by Partner Country">
+                    <input type="text" id="filter-category" placeholder="Category" class="control-input w-full sm:w-auto" aria-label="Filter by Category">
+
+                    <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-x-4 gap-y-3 items-center">
+                         <label for="sort-by" class="text-sm font-medium text-gray-600 shrink-0">Sort by:</label>
+                         <select id="sort-by" class="control-select" aria-label="Sort by">
+                             <option value="effectiveDate">Effective Date</option>
+                             <option value="reportingCountry">Reporting Country</option>
+                             <option value="partnerCountry">Partner Country</option>
+                             <option value="category">Category</option>
+                             <option value="newTariff">New Tariff Rate</option>
+                         </select>
+                         <select id="sort-direction" class="control-select" aria-label="Sort direction">
+                             <option value="desc">Descending</option>
+                             <option value="asc">Ascending</option>
+                         </select>
+                         <button id="clear-filters" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-md transition-colors shadow-sm">Clear Filters</button>
+                    </div>
+                </div>
+
+                <div id="loading-tariffs">Loading tariff data...</div> <div id="tariff-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
+
+                 <div id="tariff-card-count" class="mt-6 text-center text-sm text-gray-500">
+                     Displaying 0 updates.
+                 </div>
+            </section>
+        </div> <div id="stock-view" class="hidden">
+            <section id="stock-data">
+                 <h2 class="text-xl sm:text-2xl font-semibold mb-6 text-gray-700">Potential Stock Impact Analysis</h2>
+                 <p class="text-sm text-gray-600 mb-6 max-w-3xl">
+                     The following highlights companies and potential impacts based on general tariff themes and recent news analysis. This does not constitute financial advice.
+                 </p>
+
+                 <div id="loading-stocks" class="hidden">Loading stock data...</div> <div id="stock-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    </div>
+
+                 <div id="stock-card-count" class="mt-6 text-center text-sm text-gray-500">
+                     Displaying 0 stocks.
+                 </div>
+            </section>
+        </div> <div id="no-data" class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-r-md shadow mt-6 hidden" role="alert">
+            <p class="font-bold text-yellow-900">Data Problem</p>
+            <p>Could not load information or no data matches filters.</p>
+         </div>
+
+    </main>
+
+    <footer class="text-center p-6 mt-10 text-gray-500 text-xs sm:text-sm border-t border-gray-200">
+         Consult official sources for accurate tariff information and a financial advisor for investment decisions.
+        <br> <span id="footer-location">Seattle, WA</span> | <span id="footer-timestamp">Loading timestamp...</span>
+    </footer>
+
+    <script src="script.js" defer></script>
+</body>
+</html>
